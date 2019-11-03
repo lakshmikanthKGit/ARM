@@ -1,0 +1,1 @@
+C:\Users\v-lakopp\OneDrive\Azure\ARM\Testdeployment2\TestDeployment2\TestDeployment2\obj\Debug\TestDeployment2.deployproj.CoreCompileInputs.cache

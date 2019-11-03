@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "virtualNetworkId": {
+      "value": "AzVnet01"
+    },
+    "publicIpAddressType": {
+      "value": "dynamic"
+    },
+    "publicIpAddressSku": {
+      "value": "Basic"
+    },
+    "virtualMachineName": {
+      "value": "Testvm01"
+    },
+    "osDiskType": {
+      "value": "Standard_LRS"
+    },
+    "virtualMachineSize": {
+      "value": "standard_A0"
+    },
+    "adminUsername": {
+      "value": "lakshmi"
+    },
+    "adminPassword": {
+      "reference": {
+        "keyVault": {
+          "id": "/subscriptions/d809edec-cbb5-4c01-ba88-90d9f114a718/resourceGroups/MESHLabMunich-Testing/providers/Microsoft.KeyVault/vaults/Azkeyvault-01"
+        },
+        "secretName": "Password"
+      }
+    }
+  }
+}
