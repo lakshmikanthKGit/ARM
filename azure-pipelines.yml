@@ -8,5 +8,5 @@ steps:
     resourceGroupName: 'MunichTest_lakshmi'
     location: 'West Europe'
     templateLocation: 'Linked artifact'
-    csmFile: 'CreateAzureStorage/azuredeploy.json'
+    csmFile: 'createazurestorage/azuredeploy.json'
     deploymentMode: 'Incremental'
