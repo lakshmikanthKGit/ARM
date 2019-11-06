@@ -11,24 +11,18 @@
             "defaultValue": "administrator"
         },
         "adminipassword": {
-            "type": "securestring",
-            "reference": {
-                "keyvault": {
-                    "id": "[]"
-                },
-                "secretName": "password"
+            "type": "securestring"
 
-            }
-        },
-    }
+        }
+
+    },
     "variables": {
         "nsgId": "[resourceId('MESHLabMunich-Testing', 'Microsoft.Network/networkSecurityGroups','Azvnet01NSG')]",
-        "vnetId": "[resourceId('MESHLabMunich-Testing', 'Microsoft.Network/virtualNetworks','AzVnet01']",
+        "vnetId": "[resourceId('MESHLabMunich-Testing','Microsoft.Network/virtualNetworks','AzVnet01')]",
         "subnetRef": "[resourceId('MESHLabMunich-Testing','Microsoft.Network/virtualNetworks/subnets','AzVnet01','Subnet1')]",
-        "location": "[resourceGroup().location]",
         "networkInterfaceName": "[concat(parameters('vmname'),'-nic01')]",
         "publicIpAddressName": "[concat(parameters('vmname'),'-PIP01')]",
-        "virtualMachineRG": "[resourceGroup().name]"
+
     },
     "resources": [
         {
@@ -47,12 +41,28 @@
             }
         },
         {
+            "name": "[concat(parameters('vmname'),'avset')]",
+            "type": "Microsoft.Compute/availabilitySets",
+            "apiVersion": "2019-07-01",
+            "location": "[resourceGroup().location]",
+            "tags": {
+            },
+            "properties": {
+                "platformUpdateDomainCount": "2",
+                "platformFaultDomainCount": "3"
+
+            },
+            "sku": {
+                "name": "aligned"
+            }
+        },
+        {
             "name": "[variables('networkInterfaceName')]",
             "type": "Microsoft.Network/networkInterfaces",
             "apiVersion": "2018-08-01",
             "location": "[resourceGroup().location]",
             "dependsOn": [
-                "[resourceId('Microsoft.Network/publicIPAddresses',variables('publicIpAddressName')]"
+                "[resourceId('Microsoft.Network/publicIPAddresses',variables('publicIpAddressName'))]"
 
             ],
             "tags": {
@@ -82,7 +92,8 @@
             "location": "[resourceGroup().location]",
             "dependsOn": [
 
-                "[resourceId('Microsoft.Network/networkInterfaces',variables('networkInterfaceName')]"
+                "[resourceId('Microsoft.Network/networkInterfaces',variables('networkInterfaceName'))]",
+                "[resourceId('Microsoft.Compute/availabilitySets',concat(parameters('vmname'),'avset'))]"
             ],
             "tags": {
                 "displayName": "windowsVM1"
@@ -93,65 +104,46 @@
                 },
                 "osProfile": {
                     "computerName": "[parameters('vmname')]",
-                    "adminUsername": "[parameters('adminipassword')]",
+                    "adminUsername": "[parameters('adminuser')]",
                     "adminPassword": "[parameters('adminipassword')]"
                 },
                 "storageProfile": {
                     "imageReference": {
                         "publisher": "MicrosoftWindowsServer",
                         "offer": "WindowsServer",
-                        "sku": "2012-R2-Datacenter",
+                        "sku": "2019-Datacenter",
                         "version": "latest"
                     },
                     "osDisk": {
                         "name": "windowsVM1OSDisk",
                         "caching": "ReadWrite",
-                        "createOption": "FromImage"
+                        "createOption": "FromImage",
+                        "managedDisk": {
+                            "storageAccountType": "Standard_LRS"
+                        }
                     }
                 },
                 "networkProfile": {
                     "networkInterfaces": [
                         {
-                            "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('networkInterfaceName')]"
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('networkInterfaceName'))]"
                         }
                     ]
+                },
+                "availabilitySet": {
+                    "id": "[resourceId('Microsoft.Compute/availabilitySets',concat(parameters('vmname'),'avset'))]"
                 },
                 "diagnosticsProfile": {
                     "bootDiagnostics": {
                         "enabled": true,
-                        "storageUri": "[reference(resourceId('Microsoft.Storage/storageAccounts', toLower('windowsVM1storage'), '2015-06-15').primaryEndpoints.blob)]"
+                        "storageUri": "[reference(resourceId('MESHLabMunich-Testing','Microsoft.Storage/storageAccounts','meshdiagstorage'),'2018-07-01').primaryEndpoints.blob]"
                     }
                 }
-            },
-            "resources": [
-                {
-                    "name": "windowsVM1AzureDiagnostics",
-                    "type": "extensions",
-                    "apiVersion": "2017-03-30",
-                    "location": "[resourceGroup().location]",
-                    "tags": {
-                        "displayName": "windowsVM1AzureDiagnostics"
-                    },
-                    "dependsOn": [
-                        "[resourceId('Microsoft.Compute/virtualMachines',parameters('vmname'))]"
-                    ],
-                    "properties": {
-                        "publisher": "Microsoft.Azure.Diagnostics",
-                        "type": "IaaSDiagnostics",
-                        "typeHandlerVersion": "1.5",
-                        "autoUpgradeMinorVersion": true,
-                        "settings": {
-                            "xmlCfg": "[base64('<WadCfg> <DiagnosticMonitorConfiguration overallQuotaInMB=\"4096\" xmlns=\"http: //schemas.microsoft.com/ServiceHosting/2010/10/DiagnosticsConfiguration\"> <DiagnosticInfrastructureLogs scheduledTransferLogLevelFilter=\"Error\"/> <Logs scheduledTransferPeriod=\"PT1M\" scheduledTransferLogLevelFilter=\"Error\" /> <Directories scheduledTransferPeriod=\"PT1M\"> <IISLogs containerName =\"wad-iis-logfiles\" /> <FailedRequestLogs containerName =\"wad-failedrequestlogs\" /> </Directories> <WindowsEventLog scheduledTransferPeriod=\"PT1M\" > <DataSource name=\"Application!*\" /> </WindowsEventLog> <CrashDumps containerName=\"wad-crashdumps\" dumpType=\"Mini\"> <CrashDumpConfiguration processName=\"WaIISHost.exe\"/> <CrashDumpConfiguration processName=\"WaWorkerHost.exe\"/> <CrashDumpConfiguration processName=\"w3wp.exe\"/> </CrashDumps> <PerformanceCounters scheduledTransferPeriod=\"PT1M\"> <PerformanceCounterConfiguration counterSpecifier=\"\\Memory\\Available MBytes\" sampleRate=\"PT3M\" /> <PerformanceCounterConfiguration counterSpecifier=\"\\Web Service(_Total)\\ISAPI Extension Requests/sec\" sampleRate=\"PT3M\" /> <PerformanceCounterConfiguration counterSpecifier=\"\\Web Service(_Total)\\Bytes Total/Sec\" sampleRate=\"PT3M\" /> <PerformanceCounterConfiguration counterSpecifier=\"\\ASP.NET Applications(__Total__)\\Requests/Sec\" sampleRate=\"PT3M\" /> <PerformanceCounterConfiguration counterSpecifier=\"\\ASP.NET Applications(__Total__)\\Errors Total/Sec\" sampleRate=\"PT3M\" /> <PerformanceCounterConfiguration counterSpecifier=\"\\ASP.NET\\Requests Queued\" sampleRate=\"PT3M\" /> <PerformanceCounterConfiguration counterSpecifier=\"\\ASP.NET\\Requests Rejected\" sampleRate=\"PT3M\" /> <PerformanceCounterConfiguration counterSpecifier=\"\\Processor(_Total)\\% Processor Time\" sampleRate=\"PT3M\" /> </PerformanceCounters> </DiagnosticMonitorConfiguration> </WadCfg>')]",
-                            "storageAccount": "[toLower('windowsVM1storage')]"
-                        },
-                        "protectedSettings": {
-                            "storageAccountName": "[toLower('windowsVM1storage')]",
-                            "storageAccountKey": "[listkeys(resourceId('Microsoft.Storage/storageAccounts', toLower('windowsVM1storage')), '2015-06-15').key1]",
-                            "storageAccountEndPoint": "[reference(resourceId('Microsoft.Storage/storageAccounts', toLower('windowsVM1storage')), '2015-06-15').primaryEndpoints.blob]"
-                        }
-                    }
-                }
-            ]
+
+            }
+
+
+
         }
     ],
     "outputs": {
