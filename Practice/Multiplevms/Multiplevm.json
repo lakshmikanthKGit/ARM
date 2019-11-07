@@ -13,6 +13,12 @@
         "adminipassword": {
             "type": "securestring"
 
+        },
+        "instances": {
+            "type": "int",
+            "minValue": "1",
+            "maxValue": "5",
+            "defaultValue": "1"
         }
 
     },
@@ -20,13 +26,13 @@
         "nsgId": "[resourceId('MESHLabMunich-Testing', 'Microsoft.Network/networkSecurityGroups','Azvnet01NSG')]",
         "vnetId": "[resourceId('MESHLabMunich-Testing','Microsoft.Network/virtualNetworks','AzVnet01')]",
         "subnetRef": "[resourceId('MESHLabMunich-Testing','Microsoft.Network/virtualNetworks/subnets','AzVnet01','Subnet1')]",
-        "networkInterfaceName": "[concat(parameters('vmname'),'-nic01')]",
-        "publicIpAddressName": "[concat(parameters('vmname'),'-PIP01')]",
+        "networkInterfaceName": "[concat(parameters('vmname'),'nic')]",
+        "publicIpAddressName": "[concat(parameters('vmname'),'PIP')]",
 
     },
     "resources": [
         {
-            "name": "[variables('publicIpAddressName')]",
+            "name": "[concat(variables('publicIpAddressName'),copyIndex())]",
             "type": "Microsoft.Network/publicIPAddresses",
             "apiVersion": "2018-08-01",
             "location": "[resourceGroup().location]",
@@ -36,8 +42,13 @@
             "properties": {
                 "publicIPAllocationMethod": "Dynamic",
                 "dnsSettings": {
-                    "domainNameLabel": "[toLower(parameters('vmname'))]"
+                    "domainNameLabel": "[tolower(concat(variables('publicIpAddressName'),copyIndex()))]"
                 }
+            },
+            "copy": {
+                "name": "pipcopy",
+                "count": "[parameters('instances')]"
+
             }
         },
         {
@@ -57,12 +68,13 @@
             }
         },
         {
-            "name": "[variables('networkInterfaceName')]",
+            "name": "[concat(variables('networkInterfaceName'),copyIndex())]",
             "type": "Microsoft.Network/networkInterfaces",
             "apiVersion": "2018-08-01",
             "location": "[resourceGroup().location]",
             "dependsOn": [
-                "[resourceId('Microsoft.Network/publicIPAddresses',variables('publicIpAddressName'))]"
+                "[resourceId('Microsoft.Network/publicIPAddresses',concat(variables('publicIpAddressName'),copyIndex()))]",
+                "pipcopy"
 
             ],
             "tags": {
@@ -75,7 +87,7 @@
                         "properties": {
                             "privateIPAllocationMethod": "Dynamic",
                             "publicIPAddress": {
-                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('publicIpAddressName'))]"
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', concat(variables('publicIpAddressName'),copyIndex()))]"
                             },
                             "subnet": {
                                 "id": "[variables('subnetRef')]"
@@ -83,17 +95,23 @@
                         }
                     }
                 ]
+            },
+            "copy": {
+                "name": "niccopy",
+                "count": "[parameters('instances')]"
+
             }
         },
         {
-            "name": "[parameters('vmname')]",
+            "name": "[concat(parameters('vmname'),copyIndex())]",
             "type": "Microsoft.Compute/virtualMachines",
             "apiVersion": "2017-03-30",
             "location": "[resourceGroup().location]",
             "dependsOn": [
 
-                "[resourceId('Microsoft.Network/networkInterfaces',variables('networkInterfaceName'))]",
-                "[resourceId('Microsoft.Compute/availabilitySets',concat(parameters('vmname'),'avset'))]"
+                "[resourceId('Microsoft.Network/networkInterfaces',concat(variables('networkInterfaceName'),copyIndex()))]",
+                "[resourceId('Microsoft.Compute/availabilitySets',concat(parameters('vmname'),'avset'))]",
+                "niccopy"
             ],
             "tags": {
                 "displayName": "windowsVM1"
@@ -103,7 +121,7 @@
                     "vmSize": "Standard_A2"
                 },
                 "osProfile": {
-                    "computerName": "[parameters('vmname')]",
+                    "computerName": "[concat(parameters('vmname'),copyIndex())]",
                     "adminUsername": "[parameters('adminuser')]",
                     "adminPassword": "[parameters('adminipassword')]"
                 },
@@ -115,7 +133,7 @@
                         "version": "latest"
                     },
                     "osDisk": {
-                        "name": "windowsVM1OSDisk",
+                        "name": "[concat(parameters('vmname'),'osdisk',copyIndex())]",
                         "caching": "ReadWrite",
                         "createOption": "FromImage",
                         "managedDisk": {
@@ -126,7 +144,7 @@
                 "networkProfile": {
                     "networkInterfaces": [
                         {
-                            "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('networkInterfaceName'))]"
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(variables('networkInterfaceName'),copyIndex()))]"
                         }
                     ]
                 },
@@ -139,6 +157,11 @@
                         "storageUri": "[reference(resourceId('MESHLabMunich-Testing','Microsoft.Storage/storageAccounts','meshdiagstorage'),'2018-07-01').primaryEndpoints.blob]"
                     }
                 }
+
+            },
+            "copy": {
+                "name": "vmcopy",
+                "count": "[parameters('instances')]"
 
             }
 

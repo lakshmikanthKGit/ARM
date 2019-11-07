@@ -15,6 +15,9 @@
         },
         "secretName": "Password"
       }
+    },
+    "instances": {
+      "value": 3
     }
   }
 }
