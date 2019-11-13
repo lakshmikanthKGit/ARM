@@ -1,0 +1,264 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "vmname": {
+            "type": "string",
+            "defaultValue": "laxmitestvm"
+        },
+        "adminuser": {
+            "type": "string",
+            "defaultValue": "administrator"
+        },
+        "adminipassword": {
+            "type": "securestring"
+
+        },
+        "instances": {
+            "type": "int",
+            "minValue": "1",
+            "maxValue": "5",
+            "defaultValue": "1"
+        }
+
+    },
+    "variables": {
+        "nsgId": "[resourceId('MESHLabMunich-Testing', 'Microsoft.Network/networkSecurityGroups','Azvnet01NSG')]",
+        "vnetId": "[resourceId('MESHLabMunich-Testing','Microsoft.Network/virtualNetworks','AzVnet01')]",
+        "subnetRef": "[resourceId('MESHLabMunich-Testing','Microsoft.Network/virtualNetworks/subnets','AzVnet01','Subnet1')]",
+        "networkInterfaceName": "[concat(parameters('vmname'),'nic')]",
+        "publicIpAddressName": "[concat(parameters('vmname'),'PIP')]",
+        "lbipid": "[resourceId('Microsoft.Network/publicIPAddresses',concat(parameters('vmname'),'LBIP'))]",
+        "lbPoolID": "[concat(variables('lbID'),'/backendAddressPools/BackendPool1')]",
+        "lbID": "[resourceId('Microsoft.Network/loadBalancers',variables('lbName'))]",
+        "lbname": "[concat(parameters('vmname'),'LB')]",
+        "lbProbeID": "[concat(variables('lbID'),'/probes/tcpProbe')]"
+
+    },
+    "resources": [
+        {
+            "name": "[concat(variables('publicIpAddressName'),copyIndex())]",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2018-08-01",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "displayName": "PublicIPAddress"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Dynamic",
+                "dnsSettings": {
+                    "domainNameLabel": "[tolower(concat(variables('publicIpAddressName'),copyIndex()))]"
+                }
+            },
+            "copy": {
+                "name": "pipcopy",
+                "count": "[parameters('instances')]"
+
+            }
+        },
+        {
+            "name": "[concat(parameters('vmname'),'avset')]",
+            "type": "Microsoft.Compute/availabilitySets",
+            "apiVersion": "2019-03-01",
+            "location": "[resourceGroup().location]",
+            "tags": {
+            },
+            "properties": {
+                "platformUpdateDomainCount": "2",
+                "platformFaultDomainCount": "3"
+
+            },
+            "sku": {
+                "name": "aligned"
+            }
+        },
+        {
+            "name": "[concat(variables('networkInterfaceName'),copyIndex())]",
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2018-08-01",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses',concat(variables('publicIpAddressName'),copyIndex()))]",
+                "pipcopy"
+
+            ],
+            "tags": {
+                "displayName": "windowsVM1 Network Interface"
+            },
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipConfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', concat(variables('publicIpAddressName'),copyIndex()))]"
+                            },
+                            "subnet": {
+                                "id": "[variables('subnetRef')]"
+                            }
+                        }
+                    }
+
+
+                ],
+                "loadBalancerBackendAddressPools": [
+                    {
+                        "id": "[concat(variables('lbID'), '/backendAddressPools/BackendPool1')]"
+                    }
+                ]
+            },
+            "copy": {
+                "name": "niccopy",
+                "count": "[parameters('instances')]"
+
+            }
+        },
+        {
+            "name": "[concat(parameters('vmname'),copyIndex())]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2017-03-30",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+
+                "[resourceId('Microsoft.Network/networkInterfaces',concat(variables('networkInterfaceName'),copyIndex()))]",
+                "[resourceId('Microsoft.Compute/availabilitySets',concat(parameters('vmname'),'avset'))]",
+                "niccopy"
+            ],
+            "tags": {
+                "displayName": "windowsVM1"
+            },
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "Standard_A2"
+                },
+                "osProfile": {
+                    "computerName": "[concat(parameters('vmname'),copyIndex())]",
+                    "adminUsername": "[parameters('adminuser')]",
+                    "adminPassword": "[parameters('adminipassword')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "MicrosoftWindowsServer",
+                        "offer": "WindowsServer",
+                        "sku": "2019-Datacenter",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "name": "[concat(parameters('vmname'),'osdisk',copyIndex())]",
+                        "caching": "ReadWrite",
+                        "createOption": "FromImage",
+                        "managedDisk": {
+                            "storageAccountType": "Standard_LRS"
+                        }
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(variables('networkInterfaceName'),copyIndex()))]"
+                        }
+                    ]
+                },
+                "availabilitySet": {
+                    "id": "[resourceId('Microsoft.Compute/availabilitySets',concat(parameters('vmname'),'avset'))]"
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true,
+                        "storageUri": "[reference(resourceId('MESHLabMunich-Testing','Microsoft.Storage/storageAccounts','meshdiagstorage'),'2018-07-01').primaryEndpoints.blob]"
+                    }
+                }
+
+            },
+            "copy": {
+                "name": "vmcopy",
+                "count": "[parameters('instances')]"
+
+            }
+
+
+
+        },
+        {
+            "name": "[concat(parameters('vmname'),'LBIP')]",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2018-08-01",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "displayName": "PublicIPAddress"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Dynamic",
+                "dnsSettings": {
+                    "domainNameLabel": "[toLower(concat(parameters('vmname'),'lbip'))]"
+                }
+            },
+            "sku": {
+                "name": "Basic"
+            }
+        },
+        {
+            "apiVersion": "2015-05-01-preview",
+            "name": "[variables('lbname')]",
+            "type": "Microsoft.Network/loadBalancers",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[variables('lbipid')]"
+            ],
+            "properties": {
+                "frontendIPConfigurations": [
+                    {
+                        "name": "LoadBalancerFrontEnd",
+                        "properties": {
+                            "publicIPAddress": {
+                                "id": "[variables('lbipid')]"
+                            }
+                        }
+                    }
+                ],
+                "backendAddressPools": [
+                    {
+                        "name": "BackendPool1"
+                    }
+                ],
+                "loadBalancingRules": [
+                    {
+                        "name": "LBRule",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[concat(variables('lbID'),'/frontendIPConfigurations/LoadBalancerFrontEnd')]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[variables('lbPoolID')]"
+                            },
+                            "protocol": "Tcp",
+                            "frontendPort": 80,
+                            "backendPort": 80,
+                            "enableFloatingIP": false,
+                            "idleTimeoutInMinutes": 5,
+                            "probe": {
+                                "id": "[variables('lbProbeID')]"
+                            }
+                        }
+                    }
+                ],
+                "probes": [
+                    {
+                        "name": "tcpProbe",
+                        "properties": {
+                            "protocol": "Tcp",
+                            "port": 80,
+                            "intervalInSeconds": 5,
+                            "numberOfProbes": 2
+                        }
+                    }
+                ]
+            }
+        }
+    ],
+    "outputs": {
+    },
+    "functions": [
+    ]
+}

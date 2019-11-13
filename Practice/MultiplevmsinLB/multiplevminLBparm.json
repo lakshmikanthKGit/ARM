@@ -1,0 +1,23 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "vmname": {
+      "value": "LAXMITESTVM"
+    },
+    "adminuser": {
+      "value": "LAKSHMI"
+    },
+    "adminipassword": {
+      "reference": {
+        "keyVault": {
+          "id": "/subscriptions/d809edec-cbb5-4c01-ba88-90d9f114a718/resourceGroups/MESHLabMunich-Testing/providers/Microsoft.KeyVault/vaults/Azkeyvault-01"
+        },
+        "secretName": "Password"
+      }
+    },
+    "instances": {
+      "value": 3
+    }
+  }
+}
